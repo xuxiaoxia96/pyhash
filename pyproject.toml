@@ -1,0 +1,131 @@
+[build-system]
+# 1. 明确 wheel 版本范围，避免兼容性问题；setuptools 下限匹配 Python 3.7 支持
+requires = ["setuptools>=61.0,<75.0", "wheel>=0.38.0,<1.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hash_optimizer"
+version = "1.0.0"
+description = "高性能跨进程一致性哈希函数库，支持深层嵌套容器与自定义类型扩展"
+# 补充长描述类型，确保 PyPI 正确渲染 README.md
+readme = {file = "README.md", content-type = "text/markdown"}
+authors = [
+    {name = "XuShaoshen", email = "xushaoshen@126.com"}
+]
+# 改用 SPDX 许可证标识（PyPI 推荐，更规范）
+license = {spdx-id = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    # 补充 Python 3.12（2023 年发布，需覆盖最新版本）
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    # 补充应用场景分类，提升 PyPI 搜索曝光
+    "Topic :: Utilities",
+    "Topic :: System :: Distributed Computing"
+]
+keywords = ["hash", "hashing", "cross-process", "consistent-hash", "optimization", "deep-nested", "custom-type"]
+# 明确 Python 3.7+ 全版本支持（含未来小版本，如 3.13）
+requires-python = ">=3.7"
+dependencies = []
+
+[project.optional-dependencies]
+# 1. 拆分 dev 依赖为“测试”“格式检查”“类型检查”，按需安装
+test = [
+    "pytest>=7.0,<9.0",          # 兼容 Python 3.7（pytest 8.x 仍支持 3.7）
+    "pytest-mock>=3.8,<4.0"      # 补充常用测试依赖，提升开发体验
+]
+style = [
+    "black>=22.0,<25.0",         # 限制版本避免 breaking change
+    "flake8>=5.0,<8.0",
+    "isort>=5.10.0,<6.0.0"       # 补充导入排序工具，统一代码风格
+]
+type = [
+    # mypy 0.990 已不支持 Python 3.7，降级到兼容版本
+    "mypy>=0.971,<0.990",
+    "types-setuptools>=68.0.0,<75.0.0"  # 补充 setuptools 类型 stub，减少 mypy 警告
+]
+# 保留 dev 聚合依赖，方便一键安装所有开发工具
+dev = [
+    "hash_optimizer[test]",
+    "hash_optimizer[style]",
+    "hash_optimizer[type]"
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+# 明确排除测试文件，避免打包冗余
+exclude-packages = ["tests*"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+# 确保只打包含 __init__.py 的合法 Python 包
+include = ["hash_optimizer*"]
+exclude = ["hash_optimizer.tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# 排除测试覆盖率统计的文件（如 __init__.py）
+cov-exclude = [
+    "src/hash_optimizer/__init__.py",
+    "src/hash_optimizer/*_config.py"
+]
+
+[tool.black]
+line-length = 100
+# 明确支持 Python 3.7+ 全版本（含 3.12）
+target-version = ['py37', 'py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+# 排除虚拟环境和测试文件，避免不必要的格式化
+exclude = '''
+(
+    /(
+        \.git
+      | \.venv
+      | tests
+    )/
+)
+'''
+
+[tool.mypy]
+# 匹配 requires-python 下限，确保 Python 3.7 兼容
+python_version = "3.7"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+# 补充核心配置，减少误报、提升类型检查体验
+strict = false                # 关闭严格模式（兼容 Python 3.7 旧代码）
+check_untyped_defs = true     # 检查无类型标注的函数（平衡严格度与兼容性）
+ignore_missing_imports = true # 忽略缺失的第三方库类型 stub（避免不必要警告）
+# 明确只检查核心代码，不检查测试文件
+files = [
+    "src/hash_optimizer/**/*.py"
+]
+exclude = [
+    "src/hash_optimizer/tests/**/*.py",
+    "venv/**/*.py"
+]
+
+[tool.isort]
+# 与 black 兼容的导入排序配置
+profile = "black"
+line_length = 100
+target_version = ["py37"]
+# 统一导入分组顺序
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "FIRSTPARTY",
+    "LOCALFOLDER"
+]
