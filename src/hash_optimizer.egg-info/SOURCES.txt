@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+src/hash_optimizer.egg-info/PKG-INFO
+src/hash_optimizer.egg-info/SOURCES.txt
+src/hash_optimizer.egg-info/dependency_links.txt
+src/hash_optimizer.egg-info/requires.txt
+src/hash_optimizer.egg-info/top_level.txt
+tests/test_consistency.py
+tests/test_hasher.py
+tests/test_registry.py

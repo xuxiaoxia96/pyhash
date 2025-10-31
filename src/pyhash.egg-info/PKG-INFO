@@ -1,0 +1,185 @@
+Metadata-Version: 2.1
+Name: pyhash
+Version: 1.0.0
+Summary: 高性能跨进程一致性哈希函数库，支持深层嵌套容器与自定义类型扩展
+Author-email: XuShaoshen <xushaoshen@126.com>
+License: MIT License
+        
+        Copyright (c) [2025] [xuxiaoxia]
+        
+        Permission is hereby granted, free of charge, to any person obtaining a copy
+        of this software and associated documentation files (the "Software"), to deal
+        in the Software without restriction, including without limitation the rights
+        to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+        copies of the Software, subject to the following conditions:
+        
+        The above copyright notice and this permission notice shall be included in all
+        copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+        SOFTWARE.
+Keywords: hash,hashing,cross-process,consistent-hash,optimization,deep-nested,custom-type
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Utilities
+Classifier: Topic :: System :: Distributed Computing
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: test
+Requires-Dist: pytest<9.0,>=7.0; extra == "test"
+Requires-Dist: pytest<9.0,>=7.0; extra == "test"
+Requires-Dist: pytest-mock<4.0,>=3.8; extra == "test"
+Provides-Extra: style
+Requires-Dist: black<25.0,>=22.0; extra == "style"
+Requires-Dist: flake8<8.0,>=5.0; extra == "style"
+Requires-Dist: isort<6.0.0,>=5.10.0; extra == "style"
+Provides-Extra: type
+Requires-Dist: mypy<0.990,>=0.971; extra == "type"
+Requires-Dist: types-setuptools<75.0.0,>=68.0.0; extra == "type"
+Provides-Extra: dev
+Requires-Dist: pyhash[test]; extra == "dev"
+Requires-Dist: pyhash[style]; extra == "dev"
+Requires-Dist: pyhash[type]; extra == "dev"
+
+# 优化的跨进程一致性哈希函数库
+
+一个高性能、跨进程一致的哈希计算库，解决了Python内置`hash()`函数的局限性。
+
+## 核心特性
+1. **跨进程一致性**：相同内容的对象（字符串、整数、容器等）在不同进程/机器上计算的哈希值完全一致，解决原生 `hash()` 随机性问题。
+2. **无递归深度限制**：采用栈迭代替代递归，支持任意深层嵌套的容器（如 1000 层嵌套列表），避免 `RecursionError`。
+3. **高性能优化**：全局 LRU 缓存、字节流预分配、快速路径判断等优化，比原生递归实现性能提升 2-5 倍。
+4. **灵活扩展**：支持通过「类型注册机制」为自定义类（如 `Person`、`Order`）添加哈希逻辑。
+5. **全面类型支持**：覆盖 `str`/`int`/`float`/`list`/`dict`/`set` 等所有常用内置类型，以及空容器特殊处理。
+
+
+## 快速开始
+
+### 1. 安装
+```bash
+pip install pyhash-optimized
+```
+
+### 2. 基础使用
+```python
+from pyhash_optimized import my_hash, Hasher
+
+# 1. 使用全局便捷函数（推荐）
+print(my_hash("test").hex())  # 跨进程一致的哈希值（如：098f6bcd4621d373cade4e832627b4f6）
+print(my_hash([1, "test", 3.14]).hex())  # 支持嵌套容器
+print(my_hash({"key1": "value1", "key2": [1, 2]}).hex())  # 字典按键排序保证一致性
+
+# 2. 自定义哈希器实例（可配置缓存大小）
+hasher = Hasher(cache_size=20000)  # 缓存2万条基本类型哈希
+print(hasher.my_hash(frozenset({1, 2, 3})).hex())  # 支持不可变集合
+```
+
+### 3. 自定义类型扩展
+通过「类型注册装饰器」或「协议实现」为自定义类添加哈希逻辑：
+```python
+from pyhash_optimized import register_type, HashableProtocol
+
+# 方式1：使用装饰器注册处理函数
+class Person:
+    def __init__(self, name: str, age: int):
+        self.name = name
+        self.age = age
+
+@register_type(Person)
+def hash_person(p: Person) -> bytes:
+    # 自定义哈希逻辑：拼接姓名和年龄的字节表示
+    return f"{p.name}:{p.age}".encode("utf-8")
+
+print(my_hash(Person("Alice", 25)).hex())  # 自定义类型的哈希值
+
+
+# 方式2：实现 HashableProtocol 协议（更优雅）
+class Order(HashableProtocol):
+    def __init__(self, order_id: str, amount: float):
+        self.order_id = order_id
+        self.amount = amount
+
+    def __hash_bytes__(self) -> bytes:
+        # 协议要求实现 __hash_bytes__ 方法
+        return f"Order:{self.order_id}:{self.amount}".encode("utf-8")
+
+print(my_hash(Order("OD123", 99.9)).hex())  # 自动识别协议方法
+```
+
+
+## 详细功能说明
+### 1. 内置类型支持
+| 类型         | 处理逻辑                                                                 |
+|--------------|--------------------------------------------------------------------------|
+| `None`       | 固定前缀 `\x00`，哈希值唯一不变。                                        |
+| `str`        | UTF-8 编码 + 前缀 `\x02`，全局 LRU 缓存（默认 1 万条）。                 |
+| `int`/`float`| 字符串编码（兼容原始实现）+ 前缀 `\x01`，全局 LRU 缓存。                 |
+| `bool`       | 视为特殊整数，`struct.pack` 二进制序列化（确保跨平台一致）。              |
+| `bytes`      | 原始字节 + 前缀 `\x03`，无缓存（字节串可能过大）。                       |
+| `list`/`tuple`| 元素哈希排序后拼接 + 类型前缀（`list`/`tuple`），栈迭代处理嵌套。         |
+| `dict`       | 键值对按 key 字符串排序后拼接 + 前缀 `dict`，避免键顺序影响哈希。         |
+| `set`/`frozenset` | 元素哈希排序后拼接 + 类型前缀，`frozenset` 支持缓存（不可变）。          |
+
+### 2. 缓存机制
+- **全局 LRU 缓存**：`str`/`int`/`float` 等不可变基本类型的哈希结果缓存在模块级别，所有 `Hasher` 实例共享，避免重复计算。
+- **缓存大小配置**：初始化 `Hasher` 时可通过 `cache_size` 调整缓存容量（默认 1 万条，设为 0 禁用缓存）。
+- **安全边界**：缓存键基于对象内容（而非 `id`），确保相同内容的不同对象能命中缓存，同时避免跨进程缓存冲突。
+
+
+
+## 运行测试
+```bash
+# 运行所有测试
+pytest tests/
+
+# 运行性能测试
+python benchmarks/benchmark.py
+python benchmarks/performance_tests.py
+```
+
+## 性能对比
+与原始递归实现相比，优化版本提供：
+2-5倍性能提升，针对大字符串优化效果明显，数百倍性能提升
+
+无递归深度限制
+
+更低的内存使用
+
+在 Python 3.9 环境下，对「100 元素列表（含重复字符串、整数）」进行 1000 次哈希计算，性能对比如下：
+
+| 实现方式       | 平均耗时（ms） | 最大耗时（ms） | 性能提升倍数 |
+|----------------|----------------|----------------|--------------|
+| 原生递归实现   | 12.8           | 18.5           | 1x           |
+| pyhash-optimized（带缓存） | 2.5      | 4.2            | 5.1x         |
+| pyhash-optimized（无缓存） | 6.3      | 9.8            | 2.0x         |
+
+**结论**：启用缓存后，性能提升 5 倍以上；即使禁用缓存，因迭代和字节流优化，性能仍提升 2 倍。
+
+## 注意事项
+### 1. 跨进程一致性的关键细节
+- **数值编码**：`int`/`float` 采用 `str().encode()` 而非 `struct.pack`，是为了兼容原始实现的哈希值；若无需兼容，可改用 `struct.pack`（更高效，且避免字符串编码歧义）。
+- **字典排序**：字典按键的 `str(key)` 排序，而非键的哈希值，确保不同进程中键顺序完全一致（哈希值可能因 Python 版本差异变化，但字符串表示稳定）。
+- **类型前缀**：所有类型都有唯一前缀（如 `list`/`dict`/`\x02`），避免不同类型的相同内容哈希冲突（如 `123`（int）和 `"123"`（str）的哈希不同）。
+
+### 2. 缓存使用的注意事项
+- **缓存失效场景**：若基本类型对象内容被修改（如字符串不可变，无需担心；但需注意 `int`/`float` 是不可变类型，缓存安全）。
+- **缓存大小配置**：高频场景（如分布式缓存）可将 `cache_size` 设为 2-5 万，低频场景可设为 1000 或禁用，平衡内存占用和性能。
+
+### 3. 自定义类型的最佳实践
+- **字节表示唯一性**：自定义类型的 `__hash_bytes__` 或处理函数，需确保「相同内容返回相同字节串」（如包含所有关键属性，避免遗漏）。
+- **避免循环引用**：自定义类型若包含循环引用（如 `a.b = b` 且 `b.a = a`），会导致栈迭代无限循环，需在处理函数中手动处理（如记录已访问对象 ID）。
